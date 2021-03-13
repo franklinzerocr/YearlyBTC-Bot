@@ -1,0 +1,15 @@
+{ 
+  "TwitterKeys": {
+    "apiKey": "",
+    "apiSecret": "",
+    "bearer": "",
+    "accessToken": "",
+    "accessTokenSecret": "",
+    "accessTokenBot": "",
+    "accessTokenSecretBot": ""
+  },
+  "BinanceKeys": {
+    "public": "",
+    "secret": ""
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "yearlybtc-bot",
+  "version": "1.0.0",
+  "description": "twitter bot",
+  "main": "app.js",
+  "type": "module",
+  "dependencies": {
+    "config": "^3.3.3",
+    "node-binance-api": "^0.12.5",
+    "twitter-api-client": "^1.2.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franklinzerocr/YearlyBTC-Bot.git"
+  },
+  "keywords": [
+    "twitter"
+  ],
+  "author": "franklinzerocr",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/franklinzerocr/YearlyBTC-Bot/issues"
+  },
+  "homepage": "https://github.com/franklinzerocr/YearlyBTC-Bot#readme"
+}
