@@ -53,12 +53,12 @@ function getMonth(monthNumber) {
     errorCounter = 0,
     historicPrices = {};
 
-  // while (!dateNow || nowHours != 5) {
-  //   await sleep(1000);
-  //   dateNow = new Date();
-  //   nowHours = dateNow.getHours();
-  //   console.log(nowHours);
-  // }
+  while (!dateNow || nowHours != 5) {
+    await sleep(1000);
+    dateNow = new Date();
+    nowHours = dateNow.getHours();
+    console.log(nowHours);
+  }
 
   let timerId = setTimeout(async function tick() {
     dateNow = new Date();
