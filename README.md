@@ -1,1 +1,1 @@
-# twitter-beermoney_bot
+# YearlyBTC Bot
