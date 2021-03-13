@@ -37,8 +37,14 @@ function getMonth(monthNumber) {
   }
 }
 
+function numberWithCommas(x) {
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 (async function () {
   console.log('Start yearlybtc-bot!');
+  console.log(new Date());
+  console.log('-------');
 
   const twitter = await twitterAPI(config.TwitterKeys);
   const binance = await binanceAPI(config.BinanceKeys);
@@ -53,11 +59,11 @@ function getMonth(monthNumber) {
     errorCounter = 0,
     historicPrices = {};
 
-  while (!dateNow || nowHours != 5) {
+  while (!dateNow || nowHours != 12) {
     await sleep(1000);
     dateNow = new Date();
     nowHours = dateNow.getHours();
-    console.log(nowHours);
+    // console.log(nowHours);
   }
 
   let timerId = setTimeout(async function tick() {
@@ -73,10 +79,10 @@ function getMonth(monthNumber) {
     while (1 == 1) {
       try {
         for (let year = initialYear; year < nowYear; year++) {
-          let historicDateInit = nowMonth + '-' + nowDay + '-' + year + '  4:00';
+          let historicDateInit = nowMonth + '-' + nowDay + '-' + year + '  11:00';
           let historicDateInitTimeStamp = +new Date(historicDateInit);
 
-          let historicDateEnd = nowMonth + '-' + nowDay + '-' + year + '  5:00';
+          let historicDateEnd = nowMonth + '-' + nowDay + '-' + year + '  12:00';
           let historicDateEndTimeStamp = +new Date(historicDateEnd);
 
           await binance.candlesticks(
@@ -85,7 +91,7 @@ function getMonth(monthNumber) {
             (error, ticks, symbol) => {
               let last_tick = ticks[ticks.length - 1];
               let [time, open, high, low, close, volume, closeTime, assetVolume, trades, buyBaseVolume, buyAssetVolume, ignored] = last_tick;
-              historicPrices[year] = Math.floor(close);
+              historicPrices[year] = numberWithCommas(Math.floor(close));
             },
             { limit: 1, startTime: historicDateInitTimeStamp, endTime: historicDateEndTimeStamp }
           );
@@ -95,7 +101,7 @@ function getMonth(monthNumber) {
           await sleep(100);
         }
 
-        historicPrices[nowYear] = Math.floor((await binance.prices('BTCUSDT')).BTCUSDT);
+        historicPrices[nowYear] = numberWithCommas(Math.floor((await binance.prices('BTCUSDT')).BTCUSDT));
         break;
       } catch (e) {
         console.log('-Error-');
@@ -111,13 +117,15 @@ function getMonth(monthNumber) {
 
     tweet = '#Bitcoin on ' + getMonth(nowMonth) + ' ' + nowDay + ' of each year:\n\n';
 
-    for (let year = initialYear; year <= nowYear; year++) {
+    for (let year = nowYear; year >= initialYear; year--) {
       tweet += year + ' -> $' + historicPrices[year] + '\n';
     }
 
     let status = await twitter.tweets.statusesUpdate({ status: tweet });
 
-    // console.log(status);
+    console.log('-------');
+    console.log(dateNow);
+    console.log(tweet);
 
     timerId = setTimeout(tick, 86400000);
   }, 0);
