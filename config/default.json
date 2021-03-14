@@ -11,5 +11,10 @@
   "BinanceKeys": {
     "public": "",
     "secret": ""
+  },
+  "BitstampKeys": {
+    "key": "",
+    "secret": "",
+    "clientId": ""
   }
 }

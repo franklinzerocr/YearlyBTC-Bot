@@ -97,6 +97,11 @@ function numberWithCommas(x) {
           let historicDateEndTimeStamp = Math.round(+new Date(historicDateEnd) / 1000);
 
           //get price of candle in given moment
+          // This function OHLC does not exist on the Library. So I had to create it and put it in Bitstamp.js in line 174
+          // ohlc(currency = null,start=null,end=null, step=3600,limit=1){
+          //     const ep = "ohlc";
+          //     return this.call(this._resolveEP(ep, currency)+ `?start=${start}`+ `&end=${end}`+ `&step=${step}`+ `&limit=${limit}`, HTTP_METHOD.GET, null, false)
+          // }
           const ohlc = await bitstampAPI.ohlc(CURRENCY.BTC_USD, historicDateInitTimeStamp, historicDateEndTimeStamp);
           historicPrices[year] = numberWithCommas(Math.floor(ohlc.body.data.ohlc[0].close));
         }
