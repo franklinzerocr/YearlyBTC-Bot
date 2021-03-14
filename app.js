@@ -115,7 +115,7 @@ function numberWithCommas(x) {
       }
     }
 
-    tweet = '#Bitcoin on ' + getMonth(nowMonth) + ' ' + nowDay + ' of each year:\n\n';
+    tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
 
     for (let year = nowYear; year >= initialYear; year--) {
       tweet += year + ' -> $' + historicPrices[year] + '\n';
