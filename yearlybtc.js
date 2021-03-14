@@ -1,6 +1,6 @@
 import config from 'config';
-import { twitterAPI } from './twitterApi.mjs';
-import { binanceAPI } from './binanceAPI.mjs';
+import { TwitterClient } from 'twitter-api-client';
+import { Bitstamp, CURRENCY } from 'node-bitstamp';
 
 function sleep(ms) {
   return new Promise(resolve => {
@@ -46,19 +46,31 @@ function numberWithCommas(x) {
   console.log(new Date());
   console.log('-------');
 
-  const twitter = await twitterAPI(config.TwitterKeys);
-  const binance = await binanceAPI(config.BinanceKeys);
+  const twitter = new TwitterClient({
+    apiKey: config.TwitterKeys.apiKey,
+    apiSecret: config.TwitterKeys.apiSecret,
+    accessToken: config.TwitterKeys.accessTokenBot,
+    accessTokenSecret: config.TwitterKeys.accessTokenSecretBot,
+  });
+  const bitstampAPI = new Bitstamp({
+    key: config.BitstampKeys.key,
+    secret: config.BitstampKeys.secret,
+    clientId: config.BitstampKeys.clientId,
+    timeout: 5000,
+    rateLimit: true, //turned on by default
+  });
 
   let dateNow = null,
     nowYear = null,
     nowMonth = null,
     nowDay = null,
     nowHours = null,
-    initialYear = 2018,
+    initialYear = 2012,
     tweet = '',
     errorCounter = 0,
     historicPrices = {};
 
+  // Wait till 12pm GMT to start the daily bucle
   while (!dateNow || nowHours != 12) {
     await sleep(1000);
     dateNow = new Date();
@@ -74,34 +86,24 @@ function numberWithCommas(x) {
     nowHours = dateNow.getHours();
     errorCounter = 0;
 
-    if (nowMonth >= 8) initialYear = 2017;
-
     while (1 == 1) {
       try {
+        //loop through each year from 2012 to extract the bitcoin price
         for (let year = initialYear; year < nowYear; year++) {
           let historicDateInit = nowMonth + '-' + nowDay + '-' + year + '  11:00';
-          let historicDateInitTimeStamp = +new Date(historicDateInit);
+          let historicDateInitTimeStamp = Math.round(+new Date(historicDateInit) / 1000);
 
           let historicDateEnd = nowMonth + '-' + nowDay + '-' + year + '  12:00';
-          let historicDateEndTimeStamp = +new Date(historicDateEnd);
+          let historicDateEndTimeStamp = Math.round(+new Date(historicDateEnd) / 1000);
 
-          await binance.candlesticks(
-            'BTCUSDT',
-            '1h',
-            (error, ticks, symbol) => {
-              let last_tick = ticks[ticks.length - 1];
-              let [time, open, high, low, close, volume, closeTime, assetVolume, trades, buyBaseVolume, buyAssetVolume, ignored] = last_tick;
-              historicPrices[year] = numberWithCommas(Math.floor(close));
-            },
-            { limit: 1, startTime: historicDateInitTimeStamp, endTime: historicDateEndTimeStamp }
-          );
+          //get price of candle in given moment
+          const ohlc = await bitstampAPI.ohlc(CURRENCY.BTC_USD, historicDateInitTimeStamp, historicDateEndTimeStamp);
+          historicPrices[year] = numberWithCommas(Math.floor(ohlc.body.data.ohlc[0].close));
         }
 
-        while (Object.keys(historicPrices).length < nowYear - initialYear) {
-          await sleep(100);
-        }
+        // get last price of the "now moment"
+        historicPrices[nowYear] = numberWithCommas(Math.floor((await bitstampAPI.ticker(CURRENCY.BTC_USD)).body.last));
 
-        historicPrices[nowYear] = numberWithCommas(Math.floor((await binance.prices('BTCUSDT')).BTCUSDT));
         break;
       } catch (e) {
         console.log('-Error-');
@@ -115,13 +117,15 @@ function numberWithCommas(x) {
       }
     }
 
+    //Construct the tweet
     tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
-
     for (let year = nowYear; year >= initialYear; year--) {
       tweet += year + ' -> $' + historicPrices[year] + '\n';
     }
+    tweet += '\n#bitcoinPriceOnThisDay';
 
-    let status = await twitter.tweets.statusesUpdate({ status: tweet });
+    //Tweet
+    await twitter.tweets.statusesUpdate({ status: tweet });
 
     console.log('-------');
     console.log(dateNow);
@@ -129,5 +133,4 @@ function numberWithCommas(x) {
 
     timerId = setTimeout(tick, 86400000);
   }, 0);
-  //
 })();
