@@ -1,9 +1,14 @@
+import mysql from 'promise-mysql';
 import config from 'config';
 import { TwitterClient } from 'twitter-api-client';
 import { Bitstamp, CURRENCY } from 'node-bitstamp';
+import schedule from 'node-schedule';
+import { Telegraf } from 'telegraf';
+
+const bot = new Telegraf(config.telegram.key);
 
 function sleep(ms) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
@@ -42,50 +47,78 @@ function numberWithCommas(x) {
 }
 
 (async function () {
-  console.log('Start yearlybtc-bot!');
-  console.log(new Date());
-  console.log('-------');
-
-  const twitter = new TwitterClient({
-    apiKey: config.TwitterKeys.apiKey,
-    apiSecret: config.TwitterKeys.apiSecret,
-    accessToken: config.TwitterKeys.accessTokenBot,
-    accessTokenSecret: config.TwitterKeys.accessTokenSecretBot,
-  });
-  const bitstampAPI = new Bitstamp({
-    key: config.BitstampKeys.key,
-    secret: config.BitstampKeys.secret,
-    clientId: config.BitstampKeys.clientId,
-    timeout: 5000,
-    rateLimit: true, //turned on by default
-  });
-
-  let dateNow = null,
-    nowYear = null,
-    nowMonth = null,
-    nowDay = null,
-    nowHours = null,
-    initialYear = 2012,
-    tweet = '',
-    errorCounter = 0,
-    historicPrices = {};
-
-  // Wait till 12pm GMT to start the daily bucle
-  while (!dateNow || nowHours != 12) {
-    await sleep(1000);
-    dateNow = new Date();
-    nowHours = dateNow.getHours();
-    // console.log(nowHours);
+  async function storeChatID(chatID, title, type) {
+    try {
+      let result = await dbConnection.query('INSERT INTO `chats` (`chatID`,`title`,`type`) VALUES ("' + chatID + '","' + title + '","' + type + '");');
+      return result.insertId;
+    } catch (e) {
+      if (e.code == 'ER_DUP_ENTRY') return false;
+      console.log(e);
+      console.log('storeChatID error');
+      return false;
+    }
   }
 
-  let timerId = setTimeout(async function tick() {
-    dateNow = new Date();
-    nowYear = dateNow.getFullYear();
-    nowMonth = dateNow.getMonth() + 1;
-    nowDay = dateNow.getDate();
-    nowHours = dateNow.getHours();
-    errorCounter = 0;
+  async function updateStatus(chatID, status) {
+    try {
+      let result = await dbConnection.query('UPDATE chats SET status=' + status + " WHERE chatID='" + chatID + "';");
 
+      return result;
+    } catch (e) {
+      console.log(e);
+      console.log('updateStatus error');
+      return false;
+    }
+  }
+
+  async function getActiveChats() {
+    try {
+      let result = await dbConnection.query('SELECT * FROM chats WHERE status=1');
+      return result;
+    } catch (e) {
+      console.log(e);
+      console.log('updateStatus error');
+      return false;
+    }
+  }
+
+  async function botFunctions() {
+    bot.start(async (ctx) => {
+      ctx.reply('This Bot messages the Bitcoin Price on this day from every past year.\n\nAdd it to your group, so it can message these prices at 12pm GMT and 22pm GMT every day.\n\nAlso you can request the prices using the /yearlyBTC command\n\nSupport: @franklinzerocr');
+      // console.log(ctx.message.chat);
+      await storeChatID(ctx.message.chat.id, ctx.message.chat.type == 'private' ? ctx.message.chat.username : ctx.message.chat.title, ctx.message.chat.type);
+    });
+    //
+
+    bot.command('enable', async (ctx) => {
+      await updateStatus(ctx.message.chat.id, 1);
+      ctx.replyWithMarkdown('Auto Report is *ENABLED* ✅');
+    });
+    bot.command('disable', async (ctx) => {
+      await updateStatus(ctx.message.chat.id, 0);
+      ctx.replyWithMarkdown('Auto Report is *DISABLED*❌');
+    });
+    bot.command('yearlybtc', async (ctx) => {
+      let message = await getYearlyBTCTweet();
+      ctx.reply(message);
+    });
+
+    bot.on('text', async (ctx) => {
+      await storeChatID(ctx.update.message.chat.id, ctx.update.message.chat.type == 'private' ? ctx.update.message.chat.username : ctx.update.message.chat.title, ctx.update.message.chat.type);
+    });
+
+    bot.launch();
+
+    bot.catch((error) => {
+      console.log('------- telegraf error------\n', error);
+    });
+
+    // Enable graceful stop
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  }
+
+  async function getYearlyBTCTweet() {
     while (1 == 1) {
       try {
         //loop through each year from 2012 to extract the bitcoin price
@@ -125,17 +158,72 @@ function numberWithCommas(x) {
     //Construct the tweet
     tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
     for (let year = nowYear; year >= initialYear; year--) {
-      tweet += year + ' -> $' + historicPrices[year] + '\n';
+      tweet += year + ': $' + historicPrices[year] + '\n';
     }
     tweet += '\n#bitcoinPriceOnThisDay';
 
-    //Tweet
+    return tweet;
+  }
+
+  console.log('Start yearlybtc-bot!');
+  console.log(new Date());
+  console.log('-------');
+
+  const twitter = new TwitterClient({
+    apiKey: config.TwitterKeys.apiKey,
+    apiSecret: config.TwitterKeys.apiSecret,
+    accessToken: config.TwitterKeys.accessTokenBot,
+    accessTokenSecret: config.TwitterKeys.accessTokenSecretBot,
+  });
+  const bitstampAPI = new Bitstamp({
+    key: config.BitstampKeys.key,
+    secret: config.BitstampKeys.secret,
+    clientId: config.BitstampKeys.clientId,
+    timeout: 5000,
+    rateLimit: true, //turned on by default
+  });
+
+  const dbConnection = await mysql.createPool({
+    host: config.DB.Host,
+    user: config.DB.User,
+    password: config.DB.Password,
+    database: config.DB.DatabaseName,
+    connectionLimit: 100,
+  });
+
+  let dateNow = null,
+    nowYear = null,
+    nowMonth = null,
+    nowDay = null,
+    nowHours = null,
+    initialYear = 2012,
+    tweet = '',
+    errorCounter = 0,
+    historicPrices = {};
+
+  dateNow = new Date();
+  nowYear = dateNow.getFullYear();
+  nowMonth = dateNow.getMonth() + 1;
+  nowDay = dateNow.getDate();
+  nowHours = dateNow.getHours();
+  errorCounter = 0;
+
+  await botFunctions();
+
+  schedule.scheduleJob({ hour: 12, minute: 0, second: 0 }, async function () {
+    tweet = await getYearlyBTCTweet();
+    //   //Tweet
     await twitter.tweets.statusesUpdate({ status: tweet });
 
-    console.log('-------');
-    console.log(dateNow);
-    console.log(tweet);
+    //   //Telegram Message
+    let chats = await getActiveChats();
+    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, tweet);
+  });
 
-    timerId = setTimeout(tick, 86400000);
-  }, 0);
+  schedule.scheduleJob({ hour: 22, minute: 0, second: 0 }, async function () {
+    tweet = await getYearlyBTCTweet();
+    //Telegram Message
+    let chats = await getActiveChats();
+    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, tweet);
+  });
 })();
