@@ -211,19 +211,19 @@ function numberWithCommas(x) {
   await botFunctions();
 
   schedule.scheduleJob({ hour: 12, minute: 0, second: 0 }, async function () {
-    tweet = await getYearlyBTCTweet();
+    let message = await getYearlyBTCTweet();
     //   //Tweet
-    await twitter.tweets.statusesUpdate({ status: tweet });
+    await twitter.tweets.statusesUpdate({ status: message });
 
     //   //Telegram Message
     let chats = await getActiveChats();
-    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, tweet);
+    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, message);
   });
 
   schedule.scheduleJob({ hour: 22, minute: 0, second: 0 }, async function () {
-    tweet = await getYearlyBTCTweet();
+    let message = await getYearlyBTCTweet();
     //Telegram Message
     let chats = await getActiveChats();
-    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, tweet);
+    for (let chat of chats) bot.telegram.sendMessage(chat.chatID, message);
   });
 })();
