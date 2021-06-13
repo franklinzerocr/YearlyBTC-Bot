@@ -13,32 +13,44 @@ function sleep(ms) {
   });
 }
 
+async function checkConfigRun(end) {
+  let counter = 0;
+  while (1 == 1) {
+    await sleep(1000);
+    counter++;
+    if (counter > 10800) {
+      console.log('Exit Individually Yeah');
+      process.exit();
+    }
+  }
+}
+
 function getMonth(monthNumber) {
   switch (monthNumber) {
     case 1:
-      return 'January';
+      return 'Jan';
     case 2:
-      return 'February';
+      return 'Feb';
     case 3:
-      return 'March';
+      return 'Mar';
     case 4:
-      return 'April';
+      return 'Apr';
     case 5:
       return 'May';
     case 6:
-      return 'June';
+      return 'Jun';
     case 7:
-      return 'July';
+      return 'Jul';
     case 8:
-      return 'August';
+      return 'Aug';
     case 9:
-      return 'September';
+      return 'Sep';
     case 10:
-      return 'October';
+      return 'Oct';
     case 11:
-      return 'November';
+      return 'Nov';
     case 12:
-      return 'December';
+      return 'Dec';
   }
 }
 
@@ -84,27 +96,39 @@ function numberWithCommas(x) {
 
   async function botFunctions() {
     bot.start(async (ctx) => {
-      ctx.reply('This Bot messages the Bitcoin Price on this day from every past year.\n\nAdd it to your group, so it can message these prices at 12pm GMT and 22pm GMT every day.\n\nAlso you can request the prices using the /yearlyBTC command\n\nSupport: @franklinzerocr');
+      console.log(ctx.message);
+      ctx.reply('This Bot messages the Bitcoin Price on this day from every past year.\n\nAdd it to your group as Admin and use the /start command, so it can message these prices at 12pm GMT and 22pm GMT every day automatically.\n\nYou can also request the prices using the /yearlyBTC command\n\nSupport: @franklinzerocr');
       // console.log(ctx.message.chat);
       await storeChatID(ctx.message.chat.id, ctx.message.chat.type == 'private' ? ctx.message.chat.username : ctx.message.chat.title, ctx.message.chat.type);
     });
     //
 
     bot.command('enable', async (ctx) => {
+      console.log(ctx.message);
       await updateStatus(ctx.message.chat.id, 1);
       ctx.replyWithMarkdown('Auto Report is *ENABLED* ✅');
     });
     bot.command('disable', async (ctx) => {
+      console.log(ctx.message);
       await updateStatus(ctx.message.chat.id, 0);
       ctx.replyWithMarkdown('Auto Report is *DISABLED*❌');
     });
-    bot.command('yearlybtc', async (ctx) => {
-      let message = await getYearlyBTCTweet();
+
+    bot.command('yearly', async (ctx) => {
+      console.log(ctx.message);
+      let message = await getYearlyBTCTweet('yearly');
+      ctx.reply(message);
+    });
+
+    bot.command('monthly', async (ctx) => {
+      console.log(ctx.message);
+      let message = await getYearlyBTCTweet('monthly');
       ctx.reply(message);
     });
 
     bot.on('text', async (ctx) => {
       await storeChatID(ctx.update.message.chat.id, ctx.update.message.chat.type == 'private' ? ctx.update.message.chat.username : ctx.update.message.chat.title, ctx.update.message.chat.type);
+      // console.log(ctx.update.message);
     });
 
     bot.launch();
@@ -118,36 +142,62 @@ function numberWithCommas(x) {
     process.once('SIGTERM', () => bot.stop('SIGTERM'));
   }
 
-  async function getYearlyBTCTweet() {
+  async function getYearlyBTCTweet(timeframe = 'yearly') {
+    dateNow = new Date();
+    nowYear = dateNow.getFullYear();
+    nowMonth = dateNow.getMonth() + 1;
+    nowDay = dateNow.getDate();
+    nowHours = dateNow.getHours();
+    errorCounter = 0;
+    let flag = false;
+
     while (1 == 1) {
       try {
         //loop through each year from 2012 to extract the bitcoin price
-        for (let year = initialYear; year < nowYear; year++) {
-          let historicDateInit = nowMonth + '-' + nowDay + '-' + year + '  11:00';
-          let historicDateInitTimeStamp = Math.round(+new Date(historicDateInit) / 1000);
+        if (timeframe == 'yearly') {
+          for (let year = initialYear; year < nowYear; year++) {
+            let historicDateInit = nowMonth + '-' + nowDay + '-' + year + ' ' + (nowHours - 1) + ':00';
+            let historicDateInitTimeStamp = Math.round(+new Date(historicDateInit) / 1000);
 
-          let historicDateEnd = nowMonth + '-' + nowDay + '-' + year + '  12:00';
-          let historicDateEndTimeStamp = Math.round(+new Date(historicDateEnd) / 1000);
+            let historicDateEnd = nowMonth + '-' + nowDay + '-' + year + ' ' + nowHours + ':00';
+            let historicDateEndTimeStamp = Math.round(+new Date(historicDateEnd) / 1000);
 
-          //get price of candle in given moment
-          // This function OHLC does not exist on the Library. So I had to create it and put it in Bitstamp.js in line 174
-          // ohlc(currency = null,start=null,end=null, step=3600,limit=1){
-          //     const ep = "ohlc";
-          //     return this.call(this._resolveEP(ep, currency)+ `?start=${start}`+ `&end=${end}`+ `&step=${step}`+ `&limit=${limit}`, HTTP_METHOD.GET, null, false)
-          // }
-          const ohlc = await bitstampAPI.ohlc(CURRENCY.BTC_USD, historicDateInitTimeStamp, historicDateEndTimeStamp);
-          historicPrices[year] = numberWithCommas(Math.floor(ohlc.body.data.ohlc[0].close));
+            const ohlc = await bitstampAPI.ohlc(CURRENCY.BTC_USD, historicDateInitTimeStamp, historicDateEndTimeStamp);
+            historicPrices[year] = numberWithCommas(Math.floor(ohlc.body.data.ohlc[0].close));
+          }
+          historicPrices[nowYear] = numberWithCommas(Math.floor((await bitstampAPI.ticker(CURRENCY.BTC_USD)).body.last));
+        } else if (timeframe == 'monthly') {
+          nowYear--;
+          let auxMonth = 0;
+          for (let month = nowMonth; month < nowMonth + 12; month++) {
+            if (month > 12) {
+              auxMonth = month - 12;
+              if (!flag) {
+                flag = true;
+                nowYear++;
+              }
+            } else {
+              auxMonth = month;
+            }
+            let historicDateInit = auxMonth + '-' + nowDay + '-' + nowYear + ' ' + (nowHours - 1) + ':00';
+            let historicDateInitTimeStamp = Math.round(+new Date(historicDateInit) / 1000);
+
+            let historicDateEnd = auxMonth + '-' + nowDay + '-' + nowYear + ' ' + nowHours + ':00';
+            let historicDateEndTimeStamp = Math.round(+new Date(historicDateEnd) / 1000);
+
+            const ohlc = await bitstampAPI.ohlc(CURRENCY.BTC_USD, historicDateInitTimeStamp, historicDateEndTimeStamp);
+            historicPrices[month] = numberWithCommas(Math.floor(ohlc.body.data.ohlc[0].close));
+          }
+          historicPrices[nowMonth + 12] = numberWithCommas(Math.floor((await bitstampAPI.ticker(CURRENCY.BTC_USD)).body.last));
         }
-
         // get last price of the "now moment"
-        historicPrices[nowYear] = numberWithCommas(Math.floor((await bitstampAPI.ticker(CURRENCY.BTC_USD)).body.last));
 
         break;
       } catch (e) {
         console.log('-Error-');
         console.log(e);
         errorCounter++;
-        if (errorCounter >= 60) {
+        if (errorCounter >= 20) {
           console.log('Too many errors- EXIT');
           process.exit();
         }
@@ -155,12 +205,33 @@ function numberWithCommas(x) {
       }
     }
 
-    //Construct the tweet
-    tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
-    for (let year = nowYear; year >= initialYear; year--) {
-      tweet += year + ': $' + historicPrices[year] + '\n';
+    if (timeframe == 'yearly') {
+      //Construct the tweet
+      tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
+      for (let year = nowYear; year >= initialYear; year--) {
+        tweet += year + ': $' + historicPrices[year] + '\n';
+      }
+      tweet += '\n#BitcoinPriceOnThisDay';
+    } else if (timeframe == 'monthly') {
+      //Construct the tweet
+      tweet = '#Bitcoin price on each ' + nowDay + ' over the last year:\n\n';
+      // nowYear--;
+      flag = false;
+      let auxMonth = 0;
+      for (let month = nowMonth + 12; month >= nowMonth; month--) {
+        if (month > 12) {
+          auxMonth = month - 12;
+        } else {
+          auxMonth = month;
+          if (!flag) {
+            flag = true;
+            nowYear--;
+          }
+        }
+        tweet += getMonth(auxMonth) + ': $' + historicPrices[month] + '\n';
+      }
+      tweet += '\n#BitcoinPriceOnThisDay';
     }
-    tweet += '\n#bitcoinPriceOnThisDay';
 
     return tweet;
   }
@@ -168,6 +239,8 @@ function numberWithCommas(x) {
   console.log('Start yearlybtc-bot!');
   console.log(new Date());
   console.log('-------');
+
+  checkConfigRun();
 
   const twitter = new TwitterClient({
     apiKey: config.TwitterKeys.apiKey,
@@ -201,17 +274,10 @@ function numberWithCommas(x) {
     errorCounter = 0,
     historicPrices = {};
 
-  dateNow = new Date();
-  nowYear = dateNow.getFullYear();
-  nowMonth = dateNow.getMonth() + 1;
-  nowDay = dateNow.getDate();
-  nowHours = dateNow.getHours();
-  errorCounter = 0;
-
   await botFunctions();
 
   schedule.scheduleJob({ hour: 12, minute: 0, second: 0 }, async function () {
-    let message = await getYearlyBTCTweet();
+    let message = await getYearlyBTCTweet('yearly');
     //   //Tweet
     await twitter.tweets.statusesUpdate({ status: message });
 
@@ -221,8 +287,10 @@ function numberWithCommas(x) {
   });
 
   schedule.scheduleJob({ hour: 22, minute: 0, second: 0 }, async function () {
-    let message = await getYearlyBTCTweet();
+    let message = await getYearlyBTCTweet('monthly');
     //Telegram Message
+    await twitter.tweets.statusesUpdate({ status: message });
+
     let chats = await getActiveChats();
     for (let chat of chats) bot.telegram.sendMessage(chat.chatID, message);
   });
