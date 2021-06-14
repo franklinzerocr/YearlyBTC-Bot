@@ -207,14 +207,14 @@ function numberWithCommas(x) {
 
     if (timeframe == 'yearly') {
       //Construct the tweet
-      tweet = '#Bitcoin price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
+      tweet = '#Bitcoin yearly price on ' + getMonth(nowMonth) + ' ' + nowDay + ':\n\n';
       for (let year = nowYear; year >= initialYear; year--) {
         tweet += year + ': $' + historicPrices[year] + '\n';
       }
       tweet += '\n#BitcoinPriceOnThisDay';
     } else if (timeframe == 'monthly') {
       //Construct the tweet
-      tweet = '#Bitcoin price on each ' + nowDay + ' over the last year:\n\n';
+      tweet = '#Bitcoin monthly price on each ' + nowDay + ' over the last year:\n\n';
       // nowYear--;
       flag = false;
       let auxMonth = 0;
