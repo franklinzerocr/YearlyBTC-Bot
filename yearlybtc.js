@@ -13,18 +13,6 @@ function sleep(ms) {
   });
 }
 
-async function checkConfigRun(end) {
-  let counter = 0;
-  while (1 == 1) {
-    await sleep(1000);
-    counter++;
-    if (counter > 10800) {
-      console.log('Exit Individually Yeah');
-      process.exit();
-    }
-  }
-}
-
 function getMonth(monthNumber) {
   switch (monthNumber) {
     case 1:
@@ -240,8 +228,6 @@ function numberWithCommas(x) {
   console.log(new Date());
   console.log('-------');
 
-  checkConfigRun();
-
   const twitter = new TwitterClient({
     apiKey: config.TwitterKeys.apiKey,
     apiSecret: config.TwitterKeys.apiSecret,
@@ -275,6 +261,11 @@ function numberWithCommas(x) {
     historicPrices = {};
 
   await botFunctions();
+
+  schedule.scheduleJob({ hour: 17, minute: 0, second: 0 }, async function () {
+    console.log('Exit Individually Yeah');
+    process.exit();
+  });
 
   schedule.scheduleJob({ hour: 12, minute: 0, second: 0 }, async function () {
     let message = await getYearlyBTCTweet('yearly');
